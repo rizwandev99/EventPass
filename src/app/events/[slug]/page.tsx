@@ -4,6 +4,7 @@ import { prisma } from "@/server/db";
 import { Calendar, MapPin, ExternalLink, Ticket, Ban, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { BookingButton } from "@/components/booking/booking-button";
 import { ShareButton } from "@/components/events/share-button";
 import { generateEventCover } from "@/lib/domain/event-cover";
 import { getTierRemainingLabel, generateMapsUrl, buildEventMetadata } from "../../../../tests/unit/f4-event-detail-utils.test";
@@ -216,9 +217,7 @@ export default async function EventDetailPage({
                 Sold Out
               </Button>
             ) : (
-              <Button variant="primary" size="lg">
-                Get tickets
-              </Button>
+              <BookingButton event={event} label="Get tickets" />
             )}
           </div>
         </div>
