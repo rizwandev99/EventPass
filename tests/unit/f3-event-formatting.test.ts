@@ -1,41 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { formatEventPriceAndBadge, type TierSummary } from "@/lib/domain/events";
 
-// Domain logic for pricing text and status badges (PRD F3 AC-F3-4)
-export interface TierSummary {
-  pricePaise: number;
-  capacity: number;
-  sold: number;
-}
-
-export function formatEventPriceAndBadge(tiers: TierSummary[]): {
-  priceText: string;
-  badge: "Sold out" | "Almost gone" | null;
-} {
-  if (!tiers || tiers.length === 0) {
-    return { priceText: "Free", badge: null };
-  }
-
-  const allFree = tiers.every((t) => t.pricePaise === 0);
-  const lowestPaise = Math.min(...tiers.map((t) => t.pricePaise));
-  const totalRemaining = tiers.reduce((sum, t) => sum + Math.max(0, t.capacity - t.sold), 0);
-
-  let priceText = "";
-  if (allFree) {
-    priceText = "Free";
-  } else {
-    const rupees = Math.floor(lowestPaise / 100);
-    priceText = `From ₹${rupees.toLocaleString("en-IN")}`;
-  }
-
-  let badge: "Sold out" | "Almost gone" | null = null;
-  if (totalRemaining === 0) {
-    badge = "Sold out";
-  } else if (totalRemaining <= 10) {
-    badge = "Almost gone";
-  }
-
-  return { priceText, badge };
-}
+export { formatEventPriceAndBadge, type TierSummary };
 
 describe("F3 Event Price & Badge Formatting", () => {
   it("AC-F3-4: price text is 'From ₹X' using lowest tier, or 'Free' when every tier is free; 'Sold out' when 0 left; 'Almost gone' when <=10 left", () => {

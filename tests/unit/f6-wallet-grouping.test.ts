@@ -1,46 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { groupWalletTickets, type WalletTicketItem } from "@/lib/domain/wallet";
 
-// Domain logic for digital wallet grouping (AC-F6-2)
-export interface WalletTicketItem {
-  id: string;
-  code: string;
-  status: "VALID" | "USED" | "CANCELLED";
-  event: {
-    id: string;
-    title: string;
-    endsAt: string;
-    status: "PUBLISHED" | "CANCELLED";
-  };
-}
-
-export function groupWalletTickets(
-  tickets: WalletTicketItem[],
-  referenceNow: Date = new Date()
-): {
-  upcoming: WalletTicketItem[];
-  past: WalletTicketItem[];
-  cancelled: WalletTicketItem[];
-} {
-  const upcoming: WalletTicketItem[] = [];
-  const past: WalletTicketItem[] = [];
-  const cancelled: WalletTicketItem[] = [];
-
-  for (const t of tickets) {
-    if (t.status === "CANCELLED" || t.event.status === "CANCELLED") {
-      cancelled.push(t);
-    } else {
-      const endsAt = new Date(t.event.endsAt);
-      if (endsAt.getTime() < referenceNow.getTime()) {
-        past.push(t);
-      } else {
-        // Event not ended and ticket not cancelled
-        upcoming.push(t);
-      }
-    }
-  }
-
-  return { upcoming, past, cancelled };
-}
+export { groupWalletTickets, type WalletTicketItem };
 
 describe("F6 Wallet Ticket Grouping", () => {
   it("AC-F6-2: grouping puts tickets into Upcoming, Past, or Cancelled; handles event that ends exactly now", () => {

@@ -1,21 +1,7 @@
 import { describe, it, expect } from "vitest";
-import crypto from "crypto";
+import { generateGuestId, parseGuestCookie, createGuestCookieHeader } from "@/lib/session/guest";
 
-// Domain logic for guest session cookies (PRD F2)
-export function generateGuestId(): string {
-  // At least 128 bits of cryptographic randomness (16 bytes = 128 bits, hex = 32 chars)
-  return "gst_" + crypto.randomBytes(16).toString("hex");
-}
-
-export function parseGuestCookie(cookieHeader: string | null): string | null {
-  if (!cookieHeader) return null;
-  const match = cookieHeader.match(/eventpass_guest=([^;]+)/);
-  return match ? match[1] : null;
-}
-
-export function createGuestCookieHeader(guestId: string): string {
-  return `eventpass_guest=${guestId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`;
-}
+export { generateGuestId, parseGuestCookie, createGuestCookieHeader };
 
 describe("F2 Guest Session Integration", () => {
   it("AC-F2-1: request without guest cookie gets new cookie with >=128 bits randomness; later requests keep same ID", () => {

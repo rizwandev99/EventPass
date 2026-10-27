@@ -2,7 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { MapPin, Calendar } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { formatEventPriceAndBadge, TierSummary } from "../../../tests/unit/f3-event-formatting.test";
+import { formatEventPriceAndBadge, TierSummary } from "@/lib/domain/events";
 import { generateEventCover } from "@/lib/domain/event-cover";
 
 export interface EventCardProps {

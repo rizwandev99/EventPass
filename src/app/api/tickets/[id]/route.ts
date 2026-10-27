@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
-import { parseGuestCookie } from "../../../../../tests/integration/f2-guest-session.test";
+import { parseGuestCookie } from "@/lib/session/guest";
 
 export async function GET(
   request: NextRequest,

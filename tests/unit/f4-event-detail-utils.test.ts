@@ -1,36 +1,7 @@
 import { describe, it, expect } from "vitest";
+import { getTierRemainingLabel, generateMapsUrl, buildEventMetadata } from "@/lib/domain/events";
 
-// Domain logic for remaining ticket labels (AC-F4-3)
-export function getTierRemainingLabel(remaining: number): string {
-  if (remaining <= 0) return "Sold out";
-  if (remaining <= 20) return `${remaining} left`;
-  return "Available";
-}
-
-// Open in Maps link generator (AC-F4-8)
-export function generateMapsUrl(venue: string, city: string): string {
-  const query = `${venue}, ${city}`.trim();
-  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
-}
-
-// Metadata builder (AC-F4-7)
-export function buildEventMetadata(event: {
-  title: string;
-  description: string;
-  slug: string;
-}) {
-  return {
-    title: `${event.title} — EventPass`,
-    description: event.description.slice(0, 160),
-    openGraph: {
-      title: event.title,
-      description: event.description.slice(0, 160),
-      url: `https://eventpass.demo/events/${event.slug}`,
-      siteName: "EventPass",
-      type: "website",
-    },
-  };
-}
+export { getTierRemainingLabel, generateMapsUrl, buildEventMetadata };
 
 describe("F4 Event Detail Utilities", () => {
   it("AC-F4-3: remaining label is exact number when <=20, 'Available' above 20, and 'Sold out' at 0", () => {

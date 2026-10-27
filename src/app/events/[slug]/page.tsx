@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { BookingButton } from "@/components/booking/booking-button";
 import { ShareButton } from "@/components/events/share-button";
 import { generateEventCover } from "@/lib/domain/event-cover";
-import { getTierRemainingLabel, generateMapsUrl, buildEventMetadata } from "../../../../tests/unit/f4-event-detail-utils.test";
+import { getTierRemainingLabel, generateMapsUrl, buildEventMetadata } from "@/lib/domain/events";
 import type { Metadata } from "next";
 
 export async function generateMetadata({

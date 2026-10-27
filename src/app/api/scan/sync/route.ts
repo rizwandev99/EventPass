@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { z } from "zod";
-import { decideScan } from "../../../../../tests/unit/f8-f9-scan-decision.test";
+import { decideScan } from "@/lib/domain/scanner";
 
 const syncSchema = z.object({
   deviceId: z.string().min(1),

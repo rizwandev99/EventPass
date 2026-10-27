@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { X, CheckCircle2, AlertTriangle, ShieldCheck, CreditCard } from "lucide-react";
-import { calculateOrderTotal } from "../../../tests/unit/f5-booking-calc-and-ticket-sig.test";
+import { calculateOrderTotal } from "@/lib/domain/booking";
 
 export interface BookingModalProps {
   isOpen: boolean;

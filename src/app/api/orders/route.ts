@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { z } from "zod";
-import { generateTicketCode } from "../../../../tests/unit/f5-booking-calc-and-ticket-sig.test";
-import { parseGuestCookie, generateGuestId, createGuestCookieHeader } from "../../../../tests/integration/f2-guest-session.test";
+import { generateTicketCode } from "@/lib/domain/booking";
+import { parseGuestCookie, generateGuestId, createGuestCookieHeader } from "@/lib/session/guest";
 
 const orderSchema = z.object({
   eventId: z.string().min(1),

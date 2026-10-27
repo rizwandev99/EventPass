@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { QrCodeCard } from "@/components/wallet/qr-code-card";
-import { groupWalletTickets, WalletTicketItem } from "../../../tests/unit/f6-wallet-grouping.test";
+import { groupWalletTickets, WalletTicketItem } from "@/lib/domain/wallet";
 
 export default function WalletPage() {
   const router = useRouter();
