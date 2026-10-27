@@ -1,0 +1,54 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --bg: #FFFFFF;
+    --bg-subtle: #F7F8FA;
+    --surface: #F4F5F7;
+    --surface-raised: #FFFFFF;
+    --border: rgba(17, 18, 20, 0.08);
+    --border-strong: rgba(17, 18, 20, 0.16);
+    --text: #111214;
+    --text-muted: #5B6068;
+    --text-faint: #8B9098;
+    --accent: #5B5BD6;
+    --accent-hover: #4C4CC4;
+    --accent-soft: rgba(91, 91, 214, 0.10);
+    --success: #1F9D63;
+    --warning: #B7791F;
+    --danger: #D93844;
+    --info: #2F6FED;
+  }
+
+  .dark {
+    --bg: #0E0F12;
+    --bg-subtle: #141519;
+    --surface: #16171B;
+    --surface-raised: #1C1D22;
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.16);
+    --text: #F2F3F5;
+    --text-muted: #A0A4AB;
+    --text-faint: #6F737B;
+    --accent: #7C7FF2;
+    --accent-hover: #9296F5;
+    --accent-soft: rgba(124, 127, 242, 0.16);
+    --success: #3DD68C;
+    --warning: #F5B544;
+    --danger: #FF6B73;
+    --info: #6EA8FF;
+  }
+
+  * {
+    border-color: var(--border);
+  }
+
+  body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-feature-settings: "rlig" 1, "calt" 1;
+    -webkit-tap-highlight-color: transparent;
+  }
+}

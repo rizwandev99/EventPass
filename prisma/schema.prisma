@@ -1,0 +1,176 @@
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EventCategory {
+  MUSIC
+  TECH
+  SPORTS
+  COMEDY
+  FOOD
+  ART
+}
+
+enum EventStatus {
+  PUBLISHED
+  CANCELLED
+}
+
+enum OrderStatus {
+  CONFIRMED
+  CANCELLED
+}
+
+enum TicketStatus {
+  VALID
+  USED
+  CANCELLED
+}
+
+enum ScanResult {
+  ADMITTED
+  ALREADY_USED
+  INVALID
+  WRONG_EVENT
+  TICKET_CANCELLED
+}
+
+enum ScanSource {
+  ONLINE
+  OFFLINE_SYNC
+}
+
+model Guest {
+  id          String   @id // e.g. "gst_" + random 128-bit hex/base64url
+  displayName String?  // Optional greeting name
+  createdAt   DateTime @default(now())
+
+  orders      Order[]
+  tickets     Ticket[]
+
+  @@index([createdAt])
+}
+
+model Event {
+  id          String        @id @default(cuid())
+  slug        String        @unique
+  title       String
+  description String        @db.Text
+  category    EventCategory
+  city        String
+  venueName   String
+  address     String
+  startsAt    DateTime
+  endsAt      DateTime
+  status      EventStatus   @default(PUBLISHED)
+  coverSeed   String
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  tiers       TicketTier[]
+  orders      Order[]
+  tickets     Ticket[]
+  scanLogs    ScanLog[]
+
+  @@index([startsAt])
+  @@index([status, startsAt])
+  @@index([city])
+  @@index([category])
+}
+
+model TicketTier {
+  id          String   @id @default(cuid())
+  eventId     String
+  name        String
+  description String?  @db.Text
+  pricePaise  Int      // Integer paise (0 = free)
+  capacity    Int      // Above 0
+  sold        Int      @default(0)
+  maxPerOrder Int      @default(6)
+
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  tickets     Ticket[]
+
+  @@index([eventId])
+}
+
+model Order {
+  id             String      @id @default(cuid())
+  guestId        String
+  eventId        String
+  status         OrderStatus @default(CONFIRMED)
+  totalPaise     Int         // Sum of tier price * quantity in paise
+  attendeeName   String
+  paymentRef     String      // e.g. "FAKE-" + random string
+  idempotencyKey String?     @unique
+  createdAt      DateTime    @default(now())
+
+  guest          Guest       @relation(fields: [guestId], references: [id])
+  event          Event       @relation(fields: [eventId], references: [id])
+  tickets        Ticket[]
+
+  @@index([guestId])
+  @@index([eventId])
+  @@index([idempotencyKey])
+}
+
+model Ticket {
+  id             String       @id @default(cuid())
+  orderId        String
+  eventId        String
+  tierId         String
+  guestId        String
+  attendeeName   String
+  code           String       @unique // "EP1.<ticketId>.<sig>"
+  status         TicketStatus @default(VALID)
+  usedAt         DateTime?
+  usedByDeviceId String?
+  createdAt      DateTime     @default(now())
+
+  order          Order        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  event          Event        @relation(fields: [eventId], references: [id])
+  tier           TicketTier   @relation(fields: [tierId], references: [id])
+  guest          Guest        @relation(fields: [guestId], references: [id])
+  scanLogs       ScanLog[]
+
+  @@index([guestId])
+  @@index([eventId, status])
+  @@index([orderId])
+  @@index([tierId])
+}
+
+model ScanLog {
+  id           String     @id @default(cuid())
+  eventId      String
+  ticketId     String?
+  code         String
+  deviceId     String
+  clientScanId String?
+  result       ScanResult
+  scannedAt    DateTime
+  receivedAt   DateTime   @default(now())
+  source       ScanSource
+
+  event        Event      @relation(fields: [eventId], references: [id])
+  ticket       Ticket?    @relation(fields: [ticketId], references: [id])
+
+  @@unique([deviceId, clientScanId]) // Guarantees idempotent offline sync
+  @@index([eventId])
+  @@index([scannedAt])
+}
+
+model RateLimit {
+  id          String   @id @default(cuid())
+  key         String   // e.g. "chat:<guestId>"
+  windowStart DateTime
+  count       Int      @default(1)
+
+  @@unique([key, windowStart])
+  @@index([key])
+}
