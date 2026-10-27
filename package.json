@@ -14,7 +14,7 @@
     "test:e2e": "playwright test",
     "test:coverage": "vitest run --coverage",
     "check:ac": "tsx scripts/check-ac.ts",
-    "check": "npm run lint && npm run typecheck && npm run check:ac && npm run test && npm run test:integration",
+    "check": "npm run lint && npm run typecheck && npm run check:ac && npm run test && npm run test:integration && npm run build",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
