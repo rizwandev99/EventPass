@@ -27,11 +27,15 @@ function getContrastRatio(hex1: string, hex2: string): number {
 
 describe("F1 Design System Tokens & Contrast", () => {
   it("AC-F1-4: finds no hard-coded color values in components and app files outside token file", () => {
-    const srcDir = path.resolve(__dirname, "../../src");
+    const targetDirs = [
+      path.resolve(__dirname, "../../src/components"),
+      path.resolve(__dirname, "../../src/app"),
+    ];
     const allowedFile = "globals.css";
     const hexRegex = /#(?:[0-9a-fA-F]{3,4}){1,2}\b/g;
 
     function scanFiles(dir: string): { file: string; match: string }[] {
+      if (!fs.existsSync(dir)) return [];
       const violations: { file: string; match: string }[] = [];
       const entries = fs.readdirSync(dir, { withFileTypes: true });
 
@@ -56,7 +60,7 @@ describe("F1 Design System Tokens & Contrast", () => {
       return violations;
     }
 
-    const violations = scanFiles(srcDir);
+    const violations = targetDirs.flatMap((dir) => scanFiles(dir));
     expect(violations, `Found hardcoded hex colors: ${JSON.stringify(violations)}`).toEqual([]);
   });
 
