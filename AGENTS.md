@@ -27,4 +27,11 @@
 - Offline QR tile must retain white background with safe padding in both dark and light modes for optical readability.
 
 ### Active Milestone & Next Steps
-- Status: Milestone M0 (Project Stack, DB Schema & Quality Harness) complete. Verified Next.js 15, Prisma 6.19.3 schema (7 models), seed data (14 events, 8 edge cases), check:ac script, strict typecheck, and Vitest suite passing. Ready for Milestone M1 (App Shell, Design System & Guest Session).
+- Status: All Milestones M0 through M6 are 100% complete!
+  - M0: Database, Prisma 6 Schema, Seed Data & Test Harness
+  - M1: Linear-grade App Shell, 16 Semantic Tokens & Anonymous Guest Session (F1, F2)
+  - M2: Event Discovery with 250ms debounced search & Detail View with SVG covers (F3, F4)
+  - M3: Atomic Booking Concurrency & Digital Wallet with HMAC QR codes (F5, F6)
+  - M4: Offline PWA, Online/Offline Gate Scanner & Conflict-free Sync (F7, F8, F9)
+  - M5: Streaming AI Event Assistant with Zod tools and proposal cards (F10)
+  - M6: Domain layer decoupling, 98/98 AC coverage, 68/68 Vitest tests, 0 TS errors, clean Next.js 15 production build.
