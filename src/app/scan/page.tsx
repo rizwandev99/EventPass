@@ -4,6 +4,8 @@ import { prisma } from "@/server/db";
 import { QrCode, ArrowRight, ShieldCheck, Sparkles, MapPin, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
+export const dynamic = "force-dynamic";
+
 export default async function ScanIndexPage() {
   let events: any[] = [];
   try {

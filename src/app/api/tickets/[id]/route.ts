@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
-import { parseGuestCookie } from "@/lib/session/guest";
+import { getGuestIdFromRequest } from "@/lib/session/guest";
 
 export async function GET(
   request: NextRequest,
@@ -8,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await params;
-    const guestId = parseGuestCookie(request.headers.get("cookie"));
+    const guestId = getGuestIdFromRequest(request);
 
     if (!guestId) {
       return NextResponse.json(

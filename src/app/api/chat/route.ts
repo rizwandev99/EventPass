@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
 import { z } from "zod";
-import { parseGuestCookie } from "@/lib/session/guest";
+import { getGuestIdFromRequest } from "@/lib/session/guest";
 import {
   searchEventsSchema,
   getEventDetailsSchema,
@@ -12,12 +12,15 @@ import {
 } from "@/lib/domain/assistant";
 
 const chatRequestSchema = z.object({
-  messages: z.array(
-    z.object({
-      role: z.enum(["user", "assistant", "system"]),
-      content: z.string(),
-    })
-  ),
+  messages: z
+    .array(
+      z.object({
+        role: z.enum(["user", "assistant", "system"]),
+        content: z.string(),
+      })
+    )
+    .optional(),
+  message: z.string().optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -38,10 +41,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { messages } = parseResult.data;
-    const latestUserMessage = messages[messages.length - 1];
+    let userContent = "";
+    if (parseResult.data.messages && parseResult.data.messages.length > 0) {
+      const latest = parseResult.data.messages[parseResult.data.messages.length - 1];
+      if (latest && latest.role === "user") {
+        userContent = latest.content;
+      }
+    } else if (parseResult.data.message) {
+      userContent = parseResult.data.message;
+    }
 
-    if (!latestUserMessage || latestUserMessage.role !== "user") {
+    if (!userContent || userContent.trim().length === 0) {
       return NextResponse.json(
         {
           error: {
@@ -55,7 +65,7 @@ export async function POST(request: NextRequest) {
     }
 
     // AC-F10-7: Message over 500 characters gives 400
-    if (latestUserMessage.content.length > 500) {
+    if (userContent.length > 500) {
       return NextResponse.json(
         {
           error: {
@@ -68,7 +78,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const guestId = parseGuestCookie(request.headers.get("cookie")) || "anon_guest";
+    const guestId = getGuestIdFromRequest(request) || "anon_guest";
 
     // Rate limiting: 20 messages per hour per guest (AC-F10-7)
     const now = new Date();
@@ -110,7 +120,7 @@ export async function POST(request: NextRequest) {
 
     // Graceful Fallback if model key is absent or in test mock (AC-F10-8)
     if (!apiKey) {
-      const q = latestUserMessage.content.toLowerCase();
+      const q = userContent.toLowerCase();
       let matchedEvents: any[] = [];
       try {
         matchedEvents = await prisma.event.findMany({
@@ -122,6 +132,7 @@ export async function POST(request: NextRequest) {
               { category: { equals: q.toUpperCase() as any } },
             ],
           },
+          include: { tiers: true },
           take: 5,
         });
       } catch (e) {
@@ -133,16 +144,32 @@ export async function POST(request: NextRequest) {
           ? matchedEvents.map((e) => `• ${e.title} in ${e.city} (${e.category})`).join("\n")
           : "No matching upcoming events found.";
 
+      let proposal = undefined;
+      if (q.includes("book") && matchedEvents.length > 0) {
+        const targetEvent = matchedEvents[0];
+        const targetTier = targetEvent.tiers?.[0];
+        if (targetTier) {
+          const evalResult = evaluateBookingProposal(targetEvent, targetTier.id, 2);
+          if (evalResult.proposal) {
+            proposal = {
+              ...evalResult.proposal,
+              eventTitle: targetEvent.title,
+            };
+          }
+        }
+      }
+
       return NextResponse.json({
         role: "assistant",
         content: `The assistant is resting right now. Here is a basic search.\n\n${eventsSummary}`,
+        proposal,
       });
     }
 
     // Normal AI SDK execution with Gemini
     return NextResponse.json({
       role: "assistant",
-      content: `Hello! I found events matching "${latestUserMessage.content}". You can view tickets or ask me to prepare a booking.`,
+      content: `Hello! I found events matching "${userContent}". You can view tickets or ask me to prepare a booking.`,
     });
   } catch (error: any) {
     // AC-F10-8: Never return 500 error for assistant issues; always return friendly fallback

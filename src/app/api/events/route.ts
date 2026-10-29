@@ -119,6 +119,7 @@ export async function GET(request: NextRequest) {
     // Filter by maxPrice in memory if requested
     if (maxPrice !== undefined) {
       events = events.filter((e) => {
+        if (!e.tiers || e.tiers.length === 0) return false;
         const lowestPaise = Math.min(...e.tiers.map((t: any) => t.pricePaise));
         return lowestPaise <= maxPrice;
       });

@@ -5,10 +5,23 @@ export function generateGuestId(): string {
   return "gst_" + crypto.randomBytes(16).toString("hex");
 }
 
-export function parseGuestCookie(cookieHeader: string | null): string | null {
+export function parseGuestCookie(cookieHeader: string | null | undefined): string | null {
   if (!cookieHeader) return null;
   const match = cookieHeader.match(/eventpass_guest=([^;]+)/);
-  return match ? match[1] : null;
+  if (!match || !match[1] || match[1].trim() === "") return null;
+  return match[1].trim();
+}
+
+export function getGuestIdFromRequest(request: {
+  cookies?: { get?: (name: string) => { value: string } | undefined };
+  headers?: { get?: (name: string) => string | null };
+}): string | null {
+  const fromCookies = request.cookies?.get?.("eventpass_guest")?.value;
+  if (fromCookies && fromCookies.trim().length > 0) {
+    return fromCookies.trim();
+  }
+  const cookieHeader = request.headers?.get?.("cookie");
+  return parseGuestCookie(cookieHeader);
 }
 
 export function createGuestCookieHeader(guestId: string): string {

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Compass, Wallet, QrCode, Sparkles, Command, Info } from "lucide-react";
@@ -11,6 +11,17 @@ import { clsx } from "clsx";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && (e.key === "k" || e.key === "K")) {
+        e.preventDefault();
+        setIsCommandOpen((prev) => !prev);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   const navItems = [
     { label: "Discover", href: "/", icon: Compass },

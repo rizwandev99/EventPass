@@ -1,12 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, Download, Volume2, VolumeX, ShieldAlert, WifiOff, Camera, Check, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { ScanResultOverlay, ScanResultOverlayProps } from "@/components/scanner/scan-result-overlay";
+import {
+  saveOfflinePack,
+  getOfflinePack,
+  saveOfflineQueue,
+  getOfflineQueue,
+  clearOfflineQueue,
+} from "@/lib/offline/wallet-storage";
 
 export default function GateScannerPage() {
   const params = useParams();
@@ -30,7 +37,7 @@ export default function GateScannerPage() {
   const lastScannedTimeRef = useRef<number>(0);
 
   // Stats polling
-  async function fetchStats() {
+  const fetchStats = useCallback(async () => {
     try {
       const res = await fetch(`/api/scan/events/${eventId}/stats`);
       if (res.ok) {
@@ -38,12 +45,31 @@ export default function GateScannerPage() {
         setStats(data);
       }
     } catch (e) {}
-  }
+  }, [eventId]);
 
   useEffect(() => {
     fetchStats();
     const interval = setInterval(fetchStats, 5000);
     return () => clearInterval(interval);
+  }, [fetchStats]);
+
+  // Load offline pack and pending queue from IndexedDB on mount (AC-F9-11)
+  useEffect(() => {
+    async function loadSavedOfflineData() {
+      try {
+        const savedPack = await getOfflinePack(eventId);
+        if (savedPack) {
+          setOfflinePack(savedPack);
+          setIsPackDownloaded(true);
+          setPackDownloadTime(savedPack.downloadedAt);
+        }
+        const savedQueue = await getOfflineQueue();
+        if (savedQueue && savedQueue.length > 0) {
+          setPendingQueue(savedQueue);
+        }
+      } catch (e) {}
+    }
+    loadSavedOfflineData();
   }, [eventId]);
 
   // Audio tone via Web Audio API (AC-F8-12)
@@ -105,7 +131,12 @@ export default function GateScannerPage() {
         clientScanId: `scan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
         scannedAt: ticket.usedAt,
       };
-      setPendingQueue((prev) => [...prev, newQueueItem]);
+      setPendingQueue((prev) => {
+        const next = [...prev, newQueueItem];
+        saveOfflineQueue(next).catch(() => {});
+        return next;
+      });
+      saveOfflinePack(eventId, offlinePack).catch(() => {});
       showResult({
         result: "ADMITTED",
         attendeeName: ticket.attendeeName,
@@ -167,6 +198,7 @@ export default function GateScannerPage() {
         setOfflinePack(data);
         setIsPackDownloaded(true);
         setPackDownloadTime(data.downloadedAt);
+        await saveOfflinePack(eventId, data);
       }
     } catch (e) {} finally {
       setIsDownloading(false);
@@ -192,6 +224,7 @@ export default function GateScannerPage() {
           setConflicts((prev) => [...prev, ...serverConflicts]);
         }
         setPendingQueue([]);
+        await clearOfflineQueue();
         fetchStats();
       }
     } catch (e) {}
@@ -301,7 +334,7 @@ export default function GateScannerPage() {
           <span className="text-sm font-semibold text-[var(--text)] block">Offline Scan Pack</span>
           <span className="text-xs text-[var(--text-muted)]">
             {isPackDownloaded
-              ? `Pack active (${offlinePack?.tickets?.length || 0} tickets cached)`
+              ? `Pack downloaded (${offlinePack?.tickets?.length || 0} tickets cached)`
               : "Download tickets to IndexedDB for 100% offline gate operation"}
           </span>
         </div>

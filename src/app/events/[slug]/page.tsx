@@ -10,6 +10,8 @@ import { generateEventCover } from "@/lib/domain/event-cover";
 import { getTierRemainingLabel, generateMapsUrl, buildEventMetadata } from "@/lib/domain/events";
 import type { Metadata } from "next";
 
+export const dynamic = "force-dynamic";
+
 export async function generateMetadata({
   params,
 }: {

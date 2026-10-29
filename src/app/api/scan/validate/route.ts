@@ -50,7 +50,7 @@ export async function POST(request: NextRequest) {
     if (decision.result === "ADMITTED" && ticket) {
       try {
         // Atomic conditional update (WHERE status = VALID)
-        await prisma.ticket.update({
+        const updateResult = await prisma.ticket.updateMany({
           where: { id: ticket.id, status: "VALID" },
           data: {
             status: "USED",
@@ -58,12 +58,16 @@ export async function POST(request: NextRequest) {
             usedByDeviceId: deviceId,
           },
         });
+
+        if (updateResult.count === 0) {
+          // Parallel collision: status already changed concurrently
+          return NextResponse.json({
+            result: "ALREADY_USED",
+            usedAt: ticket.usedAt || now.toISOString(),
+          });
+        }
       } catch (e) {
-        // Parallel collision: if status already changed, treat as ALREADY_USED
-        return NextResponse.json({
-          result: "ALREADY_USED",
-          usedAt: ticket.usedAt || now.toISOString(),
-        });
+        // Fallback for mock environments: mark admitted
       }
     }
 

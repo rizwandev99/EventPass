@@ -33,6 +33,9 @@ function DiscoverPageContent() {
   useEffect(() => {
     const timer = setTimeout(() => {
       const params = new URLSearchParams(searchParams?.toString() || "");
+      if ((searchParams?.get("q") || "") === searchQuery) {
+        return;
+      }
       if (searchQuery) {
         params.set("q", searchQuery);
       } else {
@@ -44,7 +47,7 @@ function DiscoverPageContent() {
     }, 250);
 
     return () => clearTimeout(timer);
-  }, [searchQuery, router]);
+  }, [searchQuery, router, searchParams]);
 
   // Load events
   useEffect(() => {

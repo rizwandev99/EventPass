@@ -3,12 +3,17 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Wallet, Ticket as TicketIcon, Calendar, MapPin, QrCode } from "lucide-react";
+import { Wallet, Ticket as TicketIcon, Calendar, MapPin, QrCode, Clock } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { QrCodeCard } from "@/components/wallet/qr-code-card";
 import { groupWalletTickets, WalletTicketItem } from "@/lib/domain/wallet";
+import {
+  saveOfflineTickets,
+  getOfflineTickets,
+  getOfflineLastUpdated,
+} from "@/lib/offline/wallet-storage";
 
 export default function WalletPage() {
   const router = useRouter();
@@ -16,16 +21,33 @@ export default function WalletPage() {
   const [activeTab, setActiveTab] = useState<"upcoming" | "past" | "cancelled">("upcoming");
   const [selectedTicket, setSelectedTicket] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
 
   async function fetchTickets() {
     try {
       const res = await fetch("/api/tickets");
       if (res.ok) {
         const data = await res.json();
-        setTickets(data.tickets || []);
+        const freshTickets = data.tickets || [];
+        setTickets(freshTickets);
+        setLastUpdated(null);
+        await saveOfflineTickets(freshTickets);
+      } else {
+        const cached = await getOfflineTickets();
+        if (cached && cached.length > 0) {
+          setTickets(cached);
+          const updated = await getOfflineLastUpdated();
+          setLastUpdated(updated || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+        }
       }
     } catch (e) {
       // offline fallback or network sleep
+      const cached = await getOfflineTickets();
+      if (cached && cached.length > 0) {
+        setTickets(cached);
+        const updated = await getOfflineLastUpdated();
+        setLastUpdated(updated || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+      }
     } finally {
       setLoading(false);
     }
@@ -57,6 +79,12 @@ export default function WalletPage() {
           <p className="text-xs text-[var(--text-muted)] mt-1">
             Access your admission passes and gate scan QR codes
           </p>
+          {lastUpdated && (
+            <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--accent)] bg-[var(--surface-raised)] border border-[var(--border)] px-2.5 py-1 rounded-md">
+              <Clock className="w-3.5 h-3.5" />
+              <span>Last updated: {lastUpdated} (offline cache)</span>
+            </div>
+          )}
         </div>
       </div>
 

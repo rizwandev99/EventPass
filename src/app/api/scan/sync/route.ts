@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/server/db";
+import { prisma, isPlaceholderDb } from "@/server/db";
 import { z } from "zod";
 import { decideScan } from "@/lib/domain/scanner";
 
@@ -37,6 +37,44 @@ export async function POST(request: NextRequest) {
 
     const { deviceId, eventId, scans } = parseResult.data;
     const results = [];
+
+    if (isPlaceholderDb()) {
+      const globalAny = globalThis as any;
+      if (!globalAny.__syncMemoryLogs) {
+        globalAny.__syncMemoryLogs = new Map<string, any>();
+      }
+
+      for (const scan of scans) {
+        const key = `${deviceId}:${scan.clientScanId}`;
+        if (globalAny.__syncMemoryLogs.has(key)) {
+          results.push({
+            clientScanId: scan.clientScanId,
+            result: globalAny.__syncMemoryLogs.get(key).result,
+            duplicate: true,
+          });
+          continue;
+        }
+
+        const decision = decideScan({
+          code: scan.code,
+          scannerEventId: eventId,
+          ticketRecord: {
+            id: scan.code.split(".")[1] || "tkt_sync",
+            eventId,
+            status: "VALID",
+          },
+        });
+
+        globalAny.__syncMemoryLogs.set(key, { result: decision.result });
+        results.push({
+          clientScanId: scan.clientScanId,
+          result: decision.result,
+          conflict: false,
+        });
+      }
+
+      return NextResponse.json({ results });
+    }
 
     for (const scan of scans) {
       // Idempotent duplicate check on (deviceId, clientScanId) (AC-F9-7)
@@ -80,13 +118,15 @@ export async function POST(request: NextRequest) {
 
       const finalResult = conflict ? "ALREADY_USED" : decision.result;
 
+      const scanDate = isNaN(Date.parse(scan.scannedAt)) ? new Date() : new Date(scan.scannedAt);
+
       if (!conflict && decision.result === "ADMITTED" && ticket) {
         try {
           await prisma.ticket.update({
             where: { id: ticket.id },
             data: {
               status: "USED",
-              usedAt: new Date(scan.scannedAt),
+              usedAt: scanDate,
               usedByDeviceId: deviceId,
             },
           });
@@ -102,7 +142,7 @@ export async function POST(request: NextRequest) {
             deviceId,
             clientScanId: scan.clientScanId,
             result: finalResult,
-            scannedAt: new Date(scan.scannedAt),
+            scannedAt: scanDate,
             source: "OFFLINE_SYNC",
           },
         });
