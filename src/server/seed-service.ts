@@ -1,5 +1,6 @@
 import { prisma, isPlaceholderDb } from "./db";
 import { mockDb } from "./mock-db";
+import { ensurePostgresSchema } from "./db-schema";
 import { EventCategory, EventStatus } from "@prisma/client";
 import { generateTicketCode } from "@/lib/domain/booking";
 
@@ -17,7 +18,10 @@ export async function resetAndSeedDatabase(): Promise<{
     };
   }
 
-  // Clean existing database rows idempotently
+  // 1. Ensure all tables, enums, indexes and constraints exist in PostgreSQL
+  await ensurePostgresSchema(prisma);
+
+  // 2. Clean existing database rows idempotently
   await prisma.scanLog.deleteMany({});
   await prisma.ticket.deleteMany({});
   await prisma.order.deleteMany({});

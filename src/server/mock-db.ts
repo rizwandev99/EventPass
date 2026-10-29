@@ -328,6 +328,8 @@ export class InMemoryDatabase {
   $connect = async () => {};
   $disconnect = async () => {};
   $queryRaw = async () => [];
+  $executeRawUnsafe = async () => 0;
+  $executeRaw = async () => 0;
   $transaction = async (cb: any) => {
     if (typeof cb === "function") return cb(this);
     if (Array.isArray(cb)) return Promise.all(cb);

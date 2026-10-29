@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/server/db";
+import { resetAndSeedDatabase } from "@/server/seed-service";
 import { z } from "zod";
 
 const querySchema = z.object({
@@ -112,8 +113,69 @@ export async function GET(request: NextRequest) {
         },
       });
     } catch (dbErr) {
-      // Return empty list or fallback gracefully if database is sleeping/not migrated yet
-      events = [];
+      console.warn("Database query failed, attempting auto-seed initialization:", dbErr);
+      try {
+        await resetAndSeedDatabase();
+        events = await prisma.event.findMany({
+          where,
+          take: limit + 1,
+          cursor: cursor ? { id: cursor } : undefined,
+          skip: cursor ? 1 : 0,
+          orderBy,
+          include: {
+            tiers: {
+              select: {
+                id: true,
+                name: true,
+                pricePaise: true,
+                capacity: true,
+                sold: true,
+              },
+            },
+          },
+        });
+      } catch (seedErr) {
+        console.error("Auto-seed failed:", seedErr);
+        events = [];
+      }
+    }
+
+    // If initial default view has 0 events and no search filters, check if DB is empty and auto-seed
+    if (
+      events.length === 0 &&
+      !q &&
+      !category &&
+      !city &&
+      (!date || date === "any") &&
+      maxPrice === undefined &&
+      !cursor
+    ) {
+      try {
+        const total = await prisma.event.count();
+        if (total === 0) {
+          await resetAndSeedDatabase();
+          events = await prisma.event.findMany({
+            where,
+            take: limit + 1,
+            cursor: cursor ? { id: cursor } : undefined,
+            skip: cursor ? 1 : 0,
+            orderBy,
+            include: {
+              tiers: {
+                select: {
+                  id: true,
+                  name: true,
+                  pricePaise: true,
+                  capacity: true,
+                  sold: true,
+                },
+              },
+            },
+          });
+        }
+      } catch (checkErr) {
+        console.warn("Initial empty seed check warning:", checkErr);
+      }
     }
 
     // Filter by maxPrice in memory if requested

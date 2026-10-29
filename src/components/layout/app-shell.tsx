@@ -14,11 +14,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [isCommandOpen, setIsCommandOpen] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [isResetSuccess, setIsResetSuccess] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
 
   async function handleResetAndSeed() {
     if (isResetting) return;
     setIsResetting(true);
     setIsResetSuccess(false);
+    setResetError(null);
 
     try {
       const res = await fetch("/api/reset", {
@@ -26,11 +28,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       });
 
       if (!res.ok) {
-        throw new Error("Failed to reset database");
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error?.message || "Failed to reset database");
       }
 
       // Clear all offline storage (IndexedDB & localStorage)
-      await clearAllOfflineData();
+      try {
+        await clearAllOfflineData();
+      } catch (storageErr) {
+        console.warn("Storage clear warning:", storageErr);
+      }
 
       setIsResetSuccess(true);
       if (typeof window !== "undefined") {
@@ -40,9 +47,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }
         }, 500);
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error("Reset error:", err);
       setIsResetting(false);
+      setResetError(err.message || "Reset failed");
+      setTimeout(() => setResetError(null), 4000);
     }
   }
 
@@ -128,7 +137,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           >
             <span className="flex items-center gap-2 font-medium">
               <RotateCcw className={clsx("w-3.5 h-3.5 text-[var(--accent)]", isResetting && "animate-spin")} />
-              <span>{isResetting ? "Resetting..." : isResetSuccess ? "Reset & Seeded!" : "Reset & Seed"}</span>
+              <span>
+                {isResetting
+                  ? "Resetting..."
+                  : isResetSuccess
+                  ? "Reset & Seeded!"
+                  : resetError
+                  ? "Reset failed (retry)"
+                  : "Reset & Seed"}
+              </span>
             </span>
             <span className="text-[10px] text-[var(--text-faint)] font-mono">Demo</span>
           </button>
