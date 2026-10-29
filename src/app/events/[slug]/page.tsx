@@ -219,7 +219,21 @@ export default async function EventDetailPage({
                 Sold Out
               </Button>
             ) : (
-              <BookingButton event={event} label="Get tickets" />
+              <BookingButton
+                event={{
+                  id: event.id,
+                  title: event.title,
+                  tiers: (event.tiers || []).map((t: any) => ({
+                    id: t.id,
+                    name: t.name,
+                    pricePaise: t.pricePaise,
+                    capacity: t.capacity,
+                    sold: t.sold,
+                    maxPerOrder: t.maxPerOrder,
+                  })),
+                }}
+                label="Get tickets"
+              />
             )}
           </div>
         </div>

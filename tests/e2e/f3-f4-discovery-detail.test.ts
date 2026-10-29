@@ -6,14 +6,13 @@ test.describe("F3 & F4 E2E: Event Discovery & Detail View", () => {
     const searchInput = page.locator("input[placeholder*='Search events']");
     await expect(searchInput).toBeVisible();
     await searchInput.fill("Tech");
-    await page.waitForTimeout(350); // 250ms debounce
-    expect(page.url()).toContain("q=Tech");
+    await expect(page).toHaveURL(/q=Tech/, { timeout: 5000 });
   });
 
   test("AC-F3-7: no results shows empty state with Clear filters button that resets", async ({ page }) => {
     await page.goto("/?q=completely-impossible-query-xyz");
     await expect(page.locator("text=No events found")).toBeVisible();
-    const clearBtn = page.locator("button:has-text('Clear filters')");
+    const clearBtn = page.locator("button:has-text('Clear filters')").first();
     await expect(clearBtn).toBeVisible();
     await clearBtn.click();
     await expect(page.locator("text=No events found")).toBeHidden();

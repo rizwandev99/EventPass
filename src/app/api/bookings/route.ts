@@ -1,11 +1,28 @@
-import { NextRequest } from "next/server";
-import { POST as ordersPost } from "@/app/api/orders/route";
-import { GET as ticketsGet } from "@/app/api/tickets/route";
+import { NextRequest, NextResponse } from "next/server";
+import { handleCreateOrder } from "@/lib/domain/booking";
+import { prisma } from "@/server/db";
+import { getGuestIdFromRequest } from "@/lib/session/guest";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  return ordersPost(request);
+  return handleCreateOrder(request);
 }
 
 export async function GET(request: NextRequest) {
-  return ticketsGet(request);
+  try {
+    const guestId = getGuestIdFromRequest(request);
+    if (!guestId) {
+      return NextResponse.json({ bookings: [] });
+    }
+    const tickets = await prisma.ticket
+      .findMany({
+        where: { guestId },
+        include: { event: true },
+      })
+      .catch(() => []);
+    return NextResponse.json({ bookings: tickets });
+  } catch (e: any) {
+    return NextResponse.json({ bookings: [] });
+  }
 }

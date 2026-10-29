@@ -27,7 +27,7 @@ test.describe("F1 & F2 E2E: App Shell, Design System & Guest Session", () => {
   test("AC-F1-7: unknown URL shows not-found page with a link home", async ({ page }) => {
     await page.goto("/non-existent-random-route-404");
     await expect(page.locator("text=Page Not Found")).toBeVisible();
-    const homeLink = page.locator("a[href='/']").first();
+    const homeLink = page.getByRole("link", { name: "Back to Events" });
     await expect(homeLink).toBeVisible();
   });
 

@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { POST as chatPost } from "@/app/api/chat/route";
+import { handleChatRequest } from "@/lib/domain/assistant";
+
+export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
-  return chatPost(request);
+  return handleChatRequest(request);
 }
 
 export async function GET() {
