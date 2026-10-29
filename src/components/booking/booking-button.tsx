@@ -12,23 +12,39 @@ export interface BookingButtonProps {
 
 export function BookingButton({ event, disabled = false, label = "Get tickets" }: BookingButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [isOfflineNotice, setIsOfflineNotice] = useState(false);
+
+  function handleClick() {
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      setIsOfflineNotice(true);
+      return;
+    }
+    setIsOfflineNotice(false);
+    setIsOpen(true);
+  }
 
   return (
-    <>
+    <div className="flex flex-col items-end gap-1.5">
       <Button
         variant="primary"
         size="lg"
         disabled={disabled}
-        onClick={() => setIsOpen(true)}
+        onClick={handleClick}
       >
         {label}
       </Button>
+
+      {isOfflineNotice && (
+        <span role="alert" className="text-xs text-[var(--warning)] font-medium">
+          You're offline. Booking requires an active connection.
+        </span>
+      )}
 
       <BookingModal
         isOpen={isOpen}
         onClose={() => setIsOpen(false)}
         event={event}
       />
-    </>
+    </div>
   );
 }

@@ -3,14 +3,48 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Compass, Wallet, QrCode, Sparkles, Command, Info } from "lucide-react";
+import { Compass, Wallet, QrCode, Sparkles, Command, Info, RotateCcw } from "lucide-react";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CommandMenu } from "@/components/ui/command-menu";
+import { clearAllOfflineData } from "@/lib/offline/wallet-storage";
 import { clsx } from "clsx";
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isCommandOpen, setIsCommandOpen] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [isResetSuccess, setIsResetSuccess] = useState(false);
+
+  async function handleResetAndSeed() {
+    if (isResetting) return;
+    setIsResetting(true);
+    setIsResetSuccess(false);
+
+    try {
+      const res = await fetch("/api/reset", {
+        method: "POST",
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to reset database");
+      }
+
+      // Clear all offline storage (IndexedDB & localStorage)
+      await clearAllOfflineData();
+
+      setIsResetSuccess(true);
+      if (typeof window !== "undefined") {
+        setTimeout(() => {
+          if (typeof window.location?.reload === "function") {
+            window.location.reload();
+          }
+        }, 500);
+      }
+    } catch (err) {
+      console.error("Reset error:", err);
+      setIsResetting(false);
+    }
+  }
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -82,6 +116,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Command className="w-3.5 h-3.5" /> Quick search
             </span>
             <kbd className="px-1.5 py-0.5 bg-[var(--bg)] border border-[var(--border)] rounded text-[10px]">Ctrl K</kbd>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResetAndSeed}
+            disabled={isResetting}
+            data-testid="reset-seed-button"
+            aria-label="Reset and seed demo database"
+            className="w-full flex items-center justify-between px-3 py-2 text-xs text-[var(--text-muted)] hover:text-[var(--text)] bg-[var(--surface)] hover:bg-[var(--surface-raised)] rounded-md border border-[var(--border)] transition-colors min-h-[44px] disabled:opacity-50"
+          >
+            <span className="flex items-center gap-2 font-medium">
+              <RotateCcw className={clsx("w-3.5 h-3.5 text-[var(--accent)]", isResetting && "animate-spin")} />
+              <span>{isResetting ? "Resetting..." : isResetSuccess ? "Reset & Seeded!" : "Reset & Seed"}</span>
+            </span>
+            <span className="text-[10px] text-[var(--text-faint)] font-mono">Demo</span>
           </button>
 
           <div className="flex items-center justify-between pt-2 px-1">
@@ -158,7 +207,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </nav>
 
       {/* Global Command Menu */}
-      <CommandMenu isOpen={isCommandOpen} onClose={() => setIsCommandOpen(false)} />
+      <CommandMenu
+        isOpen={isCommandOpen}
+        onClose={() => setIsCommandOpen(false)}
+        onResetAndSeed={handleResetAndSeed}
+      />
     </div>
   );
 }

@@ -124,7 +124,7 @@ export default async function EventDetailPage({
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 text-sm text-[var(--text-muted)] pt-1">
             <div className="flex items-center gap-2">
               <Calendar className="w-4 h-4 text-[var(--accent)]" />
-              <span>{formattedDateTime}</span>
+              <span suppressHydrationWarning>{formattedDateTime}</span>
             </div>
             <span className="hidden sm:inline text-[var(--border-strong)]">•</span>
             <div className="flex items-center gap-2">

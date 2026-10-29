@@ -29,9 +29,22 @@ export default function WalletPage() {
       if (res.ok) {
         const data = await res.json();
         const freshTickets = data.tickets || [];
-        setTickets(freshTickets);
-        setLastUpdated(null);
-        await saveOfflineTickets(freshTickets);
+        if (freshTickets.length > 0) {
+          setTickets(freshTickets);
+          setLastUpdated(null);
+          await saveOfflineTickets(freshTickets);
+        } else {
+          // If server returned 0 tickets (e.g. fresh guest session or server restart), check offline storage
+          const cached = await getOfflineTickets();
+          if (cached && cached.length > 0) {
+            setTickets(cached);
+            const updated = await getOfflineLastUpdated();
+            setLastUpdated(updated || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
+          } else {
+            setTickets([]);
+            setLastUpdated(null);
+          }
+        }
       } else {
         const cached = await getOfflineTickets();
         if (cached && cached.length > 0) {

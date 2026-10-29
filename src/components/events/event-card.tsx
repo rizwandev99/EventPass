@@ -63,7 +63,7 @@ export function EventCard({ event }: EventCardProps) {
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5 text-xs text-[var(--accent)] font-medium">
             <Calendar className="w-3.5 h-3.5" />
-            <span>{formattedDate}</span>
+            <span suppressHydrationWarning>{formattedDate}</span>
           </div>
 
           <h3 className="font-semibold text-base text-[var(--text)] group-hover:text-[var(--accent)] transition-colors line-clamp-2">

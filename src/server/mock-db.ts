@@ -1,4 +1,4 @@
-import { generateTicketCode } from "@/lib/domain/booking";
+import { generateTicketCode } from "@/lib/domain/ticket-sig";
 
 export function isPlaceholderOrUnreachable(url?: string): boolean {
   if (!url) return true;
@@ -94,6 +94,20 @@ export function createInitialData() {
   const days = (d: number, h = 0) => new Date(now.getTime() + (d * 24 + h) * 3600 * 1000);
 
   const events: MockEvent[] = [
+    {
+      id: "evt_tech_conf",
+      slug: "tech-future-conf",
+      title: "Tech Future Summit & AI Expo",
+      description: "Annual conference exploring modern tech stacks and AI workflows.",
+      category: "TECH",
+      city: "Bengaluru",
+      venueName: "Bengaluru International Exhibition Centre",
+      address: "10th Mile, Tumkur Road, Bengaluru",
+      startsAt: days(7),
+      endsAt: days(8),
+      status: "PUBLISHED",
+      coverSeed: "tech-future-conf-seed",
+    },
     {
       id: "evt_indie_rock",
       slug: "indie-rock-night",
@@ -209,6 +223,8 @@ export function createInitialData() {
   ];
 
   const tiers: MockTier[] = [
+    // Tech conf tier
+    { id: "tier_general", eventId: "evt_tech_conf", name: "General Pass", description: "Full summit pass", pricePaise: 49900, capacity: 100, sold: 10, maxPerOrder: 10 },
     // Indie rock tiers
     { id: "tier_indie_1", eventId: "evt_indie_rock", name: "Early Bird", description: "Standard entry with complimentary drink", pricePaise: 49900, capacity: 50, sold: 10, maxPerOrder: 4 },
     { id: "tier_indie_2", eventId: "evt_indie_rock", name: "General Admission", description: "Access to main hall and standing pit", pricePaise: 89900, capacity: 100, sold: 20, maxPerOrder: 6 },
@@ -308,6 +324,15 @@ export class InMemoryDatabase {
   scanLogs: MockScanLog[] = [];
   guests: MockGuest[] = [];
   rateLimits: MockRateLimit[] = [];
+
+  $connect = async () => {};
+  $disconnect = async () => {};
+  $queryRaw = async () => [];
+  $transaction = async (cb: any) => {
+    if (typeof cb === "function") return cb(this);
+    if (Array.isArray(cb)) return Promise.all(cb);
+    return cb;
+  };
 
   constructor() {
     this.reset();
@@ -585,6 +610,25 @@ export class InMemoryDatabase {
         return { count };
       },
 
+      count: async (args: any = {}) => {
+        let results = [...this.tickets];
+        const where = args.where || {};
+        if (where.eventId) {
+          results = results.filter((t) => t.eventId === where.eventId);
+        }
+        if (where.guestId) {
+          results = results.filter((t) => t.guestId === where.guestId);
+        }
+        if (where.status) {
+          if (typeof where.status === "string") {
+            results = results.filter((t) => t.status === where.status);
+          } else if (where.status?.in && Array.isArray(where.status.in)) {
+            results = results.filter((t) => where.status.in.includes(t.status));
+          }
+        }
+        return results.length;
+      },
+
       deleteMany: async () => {
         this.tickets = [];
         return { count: 0 };
@@ -683,18 +727,6 @@ export class InMemoryDatabase {
         return { count: 0 };
       },
     };
-  }
-
-  async $transaction<T>(fn: (tx: InMemoryDatabase) => Promise<T>): Promise<T> {
-    return fn(this);
-  }
-
-  async $connect() {
-    return;
-  }
-
-  async $disconnect() {
-    return;
   }
 }
 

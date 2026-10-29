@@ -85,16 +85,26 @@ export default function AssistantPage() {
 
       const data = await res.json();
 
+      let assistantReply = "";
+      if (!res.ok) {
+        assistantReply =
+          data?.error?.message || "The assistant is momentarily unavailable. Please try again.";
+      } else {
+        assistantReply =
+          data.content || "I found some events for you. Feel free to ask more details!";
+      }
+
       const assistantMsg: ChatMessage = {
         id: `ast_${Date.now()}`,
         role: "assistant",
-        content: data.content || "I found some events for you. Feel free to ask more details!",
+        content: assistantReply,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
 
-      // If user asked to book, demo proposal card
-      if (text.toLowerCase().includes("book")) {
+      if (data.proposal) {
+        setActiveProposal(data.proposal);
+      } else if (text.toLowerCase().includes("book")) {
         setActiveProposal({
           eventTitle: "Tech Summit 2026",
           tierName: "VIP Access",
@@ -117,7 +127,7 @@ export default function AssistantPage() {
   }
 
   return (
-    <div className="max-w-2xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
+    <div className="max-w-3xl mx-auto flex flex-col h-[calc(100vh-8rem)]">
       {/* Header */}
       <div className="pb-3 border-b border-[var(--border)] flex items-center justify-between">
         <div className="flex items-center gap-2">
@@ -147,7 +157,7 @@ export default function AssistantPage() {
       )}
 
       {/* Messages Scroll Area */}
-      <div className="flex-1 overflow-y-auto px-1 space-y-4">
+      <div className="flex-1 overflow-y-auto px-2 sm:px-3 space-y-4">
         <ChatMessageList messages={messages} isStreaming={isStreaming} />
 
         {activeProposal && (

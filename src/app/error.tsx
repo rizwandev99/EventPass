@@ -12,7 +12,7 @@ export default function ErrorPage({
   reset: () => void;
 }) {
   useEffect(() => {
-    // Log error to monitoring if configured
+    console.error("Next App Error boundary caught:", error);
   }, [error]);
 
   return (

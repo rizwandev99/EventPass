@@ -2,7 +2,20 @@
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, Download, Volume2, VolumeX, ShieldAlert, WifiOff, Camera, Check, RefreshCw } from "lucide-react";
+import Script from "next/script";
+import {
+  ArrowLeft,
+  Download,
+  Volume2,
+  VolumeX,
+  ShieldAlert,
+  Camera,
+  CameraOff,
+  RefreshCw,
+  SwitchCamera,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +27,8 @@ import {
   getOfflineQueue,
   clearOfflineQueue,
 } from "@/lib/offline/wallet-storage";
+
+type CameraStatus = "idle" | "requesting" | "streaming" | "denied" | "error";
 
 export default function GateScannerPage() {
   const params = useParams();
@@ -33,6 +48,15 @@ export default function GateScannerPage() {
   const [packDownloadTime, setPackDownloadTime] = useState<string | null>(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  // Camera States
+  const [cameraStatus, setCameraStatus] = useState<CameraStatus>("idle");
+  const [cameraErrorMessage, setCameraErrorMessage] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<"environment" | "user">("environment");
+
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const isScanningRef = useRef<boolean>(false);
   const lastScannedCodeRef = useRef<string>("");
   const lastScannedTimeRef = useRef<number>(0);
 
@@ -72,6 +96,16 @@ export default function GateScannerPage() {
     loadSavedOfflineData();
   }, [eventId]);
 
+  // Load fallback jsQR script if native BarcodeDetector is absent
+  useEffect(() => {
+    if (typeof window !== "undefined" && !(window as any).jsQR) {
+      const script = document.createElement("script");
+      script.src = "/jsqr.js";
+      script.async = true;
+      document.body.appendChild(script);
+    }
+  }, []);
+
   // Audio tone via Web Audio API (AC-F8-12)
   function playAudioFeedback(success: boolean) {
     if (isMuted) return;
@@ -100,82 +134,85 @@ export default function GateScannerPage() {
   }
 
   // Handle Scan validation
-  async function handleValidate(codeToValidate: string) {
-    const code = codeToValidate.trim();
-    if (!code) return;
+  const handleValidate = useCallback(
+    async (codeToValidate: string) => {
+      const code = codeToValidate.trim();
+      if (!code) return;
 
-    // 3-second duplicate scan guard (AC-F8-7)
-    const now = Date.now();
-    if (code === lastScannedCodeRef.current && now - lastScannedTimeRef.current < 3000) {
-      return;
-    }
-    lastScannedCodeRef.current = code;
-    lastScannedTimeRef.current = now;
-
-    // Check offline mode
-    if (isOfflineMode && offlinePack) {
-      const ticket = offlinePack.tickets.find((t: any) => t.code === code);
-      if (!ticket) {
-        showResult({ result: "INVALID" });
+      // 3-second duplicate scan guard (AC-F8-7)
+      const now = Date.now();
+      if (code === lastScannedCodeRef.current && now - lastScannedTimeRef.current < 3000) {
         return;
       }
-      if (ticket.status === "USED") {
-        showResult({ result: "ALREADY_USED", usedAt: ticket.usedAt });
-        return;
-      }
-      // Offline admit
-      ticket.status = "USED";
-      ticket.usedAt = new Date().toISOString();
-      const newQueueItem = {
-        code,
-        clientScanId: `scan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        scannedAt: ticket.usedAt,
-      };
-      setPendingQueue((prev) => {
-        const next = [...prev, newQueueItem];
-        saveOfflineQueue(next).catch(() => {});
-        return next;
-      });
-      saveOfflinePack(eventId, offlinePack).catch(() => {});
-      showResult({
-        result: "ADMITTED",
-        attendeeName: ticket.attendeeName,
-        tierName: ticket.tierName,
-      });
-      return;
-    }
+      lastScannedCodeRef.current = code;
+      lastScannedTimeRef.current = now;
 
-    try {
-      const res = await fetch("/api/scan/validate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      // Check offline mode
+      if (isOfflineMode && offlinePack) {
+        const ticket = offlinePack.tickets?.find((t: any) => t.code === code);
+        if (!ticket) {
+          showResult({ result: "INVALID" });
+          return;
+        }
+        if (ticket.status === "USED") {
+          showResult({ result: "ALREADY_USED", usedAt: ticket.usedAt });
+          return;
+        }
+        // Offline admit
+        ticket.status = "USED";
+        ticket.usedAt = new Date().toISOString();
+        const newQueueItem = {
           code,
-          eventId,
-          deviceId: "device_gate_scanner_primary",
-        }),
-      });
+          clientScanId: `scan_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          scannedAt: ticket.usedAt,
+        };
+        setPendingQueue((prev) => {
+          const next = [...prev, newQueueItem];
+          saveOfflineQueue(next).catch(() => {});
+          return next;
+        });
+        saveOfflinePack(eventId, offlinePack).catch(() => {});
+        showResult({
+          result: "ADMITTED",
+          attendeeName: ticket.attendeeName,
+          tierName: ticket.tierName,
+        });
+        return;
+      }
 
-      const data = await res.json();
-      showResult({
-        result: data.result || "INVALID",
-        attendeeName: data.ticket?.attendeeName,
-        tierName: data.ticket?.tierName,
-        usedAt: data.ticket?.usedAt,
-        wrongEventTitle: data.wrongEventTitle,
-      });
+      try {
+        const res = await fetch("/api/scan/validate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            code,
+            eventId,
+            deviceId: "device_gate_scanner_primary",
+          }),
+        });
 
-      setScanHistory((prev) => [
-        { code, result: data.result, time: new Date().toLocaleTimeString() },
-        ...prev.slice(0, 9),
-      ]);
+        const data = await res.json();
+        showResult({
+          result: data.result || "INVALID",
+          attendeeName: data.ticket?.attendeeName,
+          tierName: data.ticket?.tierName,
+          usedAt: data.ticket?.usedAt,
+          wrongEventTitle: data.wrongEventTitle,
+        });
 
-      fetchStats();
-    } catch (e) {
-      // Network failure -> auto switch to offline mode
-      setIsOfflineMode(true);
-    }
-  }
+        setScanHistory((prev) => [
+          { code, result: data.result, time: new Date().toLocaleTimeString() },
+          ...prev.slice(0, 9),
+        ]);
+
+        fetchStats();
+      } catch (e) {
+        // Network failure -> auto switch to offline mode
+        setIsOfflineMode(true);
+      }
+    },
+    [eventId, isOfflineMode, offlinePack, fetchStats]
+  );
 
   function showResult(resultData: ScanResultOverlayProps) {
     const isSuccess = resultData.result === "ADMITTED";
@@ -188,6 +225,129 @@ export default function GateScannerPage() {
       setLastScanResult(null);
     }, 1500);
   }
+
+  // Start Camera Stream
+  const startCamera = useCallback(async () => {
+    if (typeof navigator === "undefined" || !navigator.mediaDevices?.getUserMedia) {
+      setCameraStatus("denied");
+      setCameraErrorMessage("Camera is not supported on this browser or connection.");
+      return;
+    }
+
+    setCameraStatus("requesting");
+    setCameraErrorMessage(null);
+
+    // Stop existing stream if any
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+
+    try {
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: { ideal: facingMode } },
+          audio: false,
+        });
+      } catch (err: any) {
+        // Fallback for laptops/desktops without environment camera
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: true,
+          audio: false,
+        });
+      }
+
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play().catch(() => {});
+      }
+      setCameraStatus("streaming");
+    } catch (err: any) {
+      console.warn("Camera init failed:", err);
+      if (err.name === "NotAllowedError" || err.name === "PermissionDeniedError") {
+        setCameraStatus("denied");
+        setCameraErrorMessage("Camera permission was denied. Please allow camera permissions in browser settings or use manual entry below.");
+      } else if (err.name === "NotFoundError" || err.name === "DevicesNotFoundError") {
+        setCameraStatus("error");
+        setCameraErrorMessage("No camera device was detected. Please connect a camera or use manual entry below.");
+      } else {
+        setCameraStatus("error");
+        setCameraErrorMessage(err.message || "Failed to access camera. Please use manual entry below.");
+      }
+    }
+  }, [facingMode]);
+
+  // Stop camera on unmount
+  useEffect(() => {
+    startCamera();
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+      }
+    };
+  }, [startCamera]);
+
+  // Continuous Camera Frame QR Scanning Loop
+  useEffect(() => {
+    if (cameraStatus !== "streaming") return;
+
+    isScanningRef.current = true;
+    let animationFrameId: number;
+
+    const scan = async () => {
+      if (!isScanningRef.current) return;
+
+      const video = videoRef.current;
+      if (video && video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA && video.videoWidth > 0) {
+        try {
+          // Priority 1: Built-in native BarcodeDetector API
+          if (typeof window !== "undefined" && "BarcodeDetector" in window) {
+            const detector = new (window as any).BarcodeDetector({ formats: ["qr_code"] });
+            const barcodes = await detector.detect(video);
+            if (barcodes && barcodes.length > 0 && barcodes[0]?.rawValue) {
+              handleValidate(barcodes[0].rawValue);
+            }
+          } else if (typeof window !== "undefined" && (window as any).jsQR) {
+            // Priority 2: Fallback jsQR canvas reader
+            if (!canvasRef.current) {
+              canvasRef.current = document.createElement("canvas");
+            }
+            const canvas = canvasRef.current;
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d", { willReadFrequently: true });
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const code = (window as any).jsQR(imageData.data, imageData.width, imageData.height);
+              if (code && code.data) {
+                handleValidate(code.data);
+              }
+            }
+          }
+        } catch (e) {
+          // Swallow intermittent decoding frame errors
+        }
+      }
+
+      // Schedule next frame scan (~150ms interval keeps CPU light and scanner responsive)
+      setTimeout(() => {
+        if (isScanningRef.current) {
+          animationFrameId = requestAnimationFrame(scan);
+        }
+      }, 150);
+    };
+
+    animationFrameId = requestAnimationFrame(scan);
+
+    return () => {
+      isScanningRef.current = false;
+      if (animationFrameId) cancelAnimationFrame(animationFrameId);
+    };
+  }, [cameraStatus, handleValidate]);
 
   async function handleDownloadPack() {
     setIsDownloading(true);
@@ -235,6 +395,8 @@ export default function GateScannerPage() {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 py-2">
+      <Script src="/jsqr.js" strategy="afterInteractive" />
+
       {/* Top Bar */}
       <div className="flex items-center justify-between">
         <button
@@ -291,21 +453,113 @@ export default function GateScannerPage() {
         </div>
       </div>
 
-      {/* Camera Preview Frame Overlay */}
-      <div className="rounded-2xl border-2 border-dashed border-[var(--border-strong)] bg-neutral-950 p-6 flex flex-col items-center justify-center relative min-h-[220px] text-center overflow-hidden">
-        <Camera className="w-12 h-12 text-neutral-600 mb-2" />
-        <span className="text-xs text-neutral-400 font-medium">Camera Viewfinder Active</span>
-        <span className="text-[11px] text-neutral-600 max-w-xs mt-1">
-          Align QR code inside viewfinder frame or use manual entry below
-        </span>
+      {/* Interactive Camera Viewfinder Frame */}
+      <div className="relative rounded-2xl border-2 border-[var(--border-strong)] bg-neutral-950 overflow-hidden min-h-[280px] sm:min-h-[320px] flex flex-col items-center justify-center">
+        {/* Live Camera Video Feed */}
+        <video
+          ref={videoRef}
+          playsInline
+          autoPlay
+          muted
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            cameraStatus === "streaming" ? "opacity-100" : "opacity-0 pointer-events-none"
+          }`}
+        />
 
-        {/* Viewfinder Target Box */}
-        <div className="w-36 h-36 border-2 border-[var(--accent)]/60 rounded-xl mt-3 flex items-center justify-center pointer-events-none">
-          <div className="w-24 h-24 border border-dashed border-white/20 rounded-lg" />
-        </div>
+        {/* Viewfinder Target Reticle Overlay (Shown when streaming) */}
+        {cameraStatus === "streaming" && (
+          <div className="relative z-10 flex flex-col items-center justify-center pointer-events-none w-full h-full p-4">
+            <div className="w-48 h-48 sm:w-56 sm:h-56 relative border-2 border-[var(--accent)]/80 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.5)]">
+              {/* Corner accents */}
+              <div className="absolute -top-1 -left-1 w-5 h-5 border-t-4 border-l-4 border-[var(--accent)] rounded-tl" />
+              <div className="absolute -top-1 -right-1 w-5 h-5 border-t-4 border-r-4 border-[var(--accent)] rounded-tr" />
+              <div className="absolute -bottom-1 -left-1 w-5 h-5 border-b-4 border-l-4 border-[var(--accent)] rounded-bl" />
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 border-b-4 border-r-4 border-[var(--accent)] rounded-br" />
+
+              {/* Scanning laser animation bar */}
+              <div className="absolute inset-x-2 top-0 h-0.5 bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent animate-pulse" />
+            </div>
+
+            <span className="mt-4 text-xs font-medium text-white/90 drop-shadow-md bg-black/60 px-3 py-1 rounded-full">
+              Point camera at ticket QR code
+            </span>
+          </div>
+        )}
+
+        {/* Camera Switch Floating Control */}
+        {cameraStatus === "streaming" && (
+          <div className="absolute bottom-3 right-3 z-20">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setFacingMode((prev) => (prev === "environment" ? "user" : "environment"));
+              }}
+              className="gap-1.5 bg-black/60 hover:bg-black/80 text-white border-white/20 backdrop-blur-sm text-xs"
+              title="Flip camera"
+            >
+              <SwitchCamera className="w-3.5 h-3.5" />
+              <span>Flip</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Requesting Camera Access State */}
+        {cameraStatus === "requesting" && (
+          <div className="relative z-10 flex flex-col items-center p-6 text-center space-y-2">
+            <Loader2 className="w-8 h-8 text-[var(--accent)] animate-spin" />
+            <span className="text-xs text-neutral-300 font-medium">Requesting camera access...</span>
+            <span className="text-[11px] text-neutral-500 max-w-xs">
+              Please allow camera permissions in your browser prompt.
+            </span>
+          </div>
+        )}
+
+        {/* Camera Permission Denied / Error State */}
+        {(cameraStatus === "denied" || cameraStatus === "error") && (
+          <div className="relative z-10 flex flex-col items-center p-6 text-center space-y-3">
+            <CameraOff className="w-10 h-10 text-[var(--warning)]" />
+            <div className="space-y-1">
+              <span className="text-xs font-semibold text-neutral-200 block">
+                {cameraStatus === "denied" ? "Camera Access Denied" : "Camera Unavailable"}
+              </span>
+              <p className="text-[11px] text-neutral-400 max-w-xs leading-relaxed">
+                {cameraErrorMessage ||
+                  "Unable to access the camera. Please allow camera permissions in browser settings or use manual entry below."}
+              </p>
+            </div>
+            <Button variant="secondary" size="sm" onClick={startCamera} className="gap-1.5 text-xs">
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>Retry Camera</span>
+            </Button>
+          </div>
+        )}
+
+        {/* Idle State Fallback */}
+        {cameraStatus === "idle" && (
+          <div className="relative z-10 flex flex-col items-center p-6 text-center space-y-2">
+            <Camera className="w-10 h-10 text-neutral-500" />
+            <span className="text-xs text-neutral-400">Camera Viewfinder</span>
+            <Button variant="secondary" size="sm" onClick={startCamera} className="text-xs mt-2">
+              Start Camera
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Manual Code Entry Form (AC-F8-8) */}
+      {/* Demo Tip Panel (PRD F8) */}
+      <div className="p-4 rounded-xl border border-[var(--border)] bg-[var(--surface-raised)]/40 text-xs text-[var(--text-muted)] space-y-1.5">
+        <span className="font-semibold text-[var(--text)] flex items-center gap-1.5">
+          <Sparkles className="w-3.5 h-3.5 text-[var(--accent)]" />
+          Demo Tip
+        </span>
+        <p>
+          Book tickets from <span className="text-[var(--text)] font-medium">Discover</span>, open the{" "}
+          <span className="text-[var(--text)] font-medium">Digital Wallet</span> on another screen or phone, and point the camera at the QR code. You can also paste ticket codes into the manual entry box below.
+        </p>
+      </div>
+
+      {/* Manual Code Entry Form (AC-F8-8 & AC-F8-9) */}
       <div className="p-4 sm:p-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] space-y-3">
         <h3 className="text-sm font-semibold text-[var(--text)]">Manual Code Entry</h3>
         <div className="flex gap-2">

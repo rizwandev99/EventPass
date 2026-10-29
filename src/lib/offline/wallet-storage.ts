@@ -189,3 +189,36 @@ export async function clearOfflineQueue(): Promise<void> {
     console.warn("Could not clear offline queue:", e);
   }
 }
+
+export async function clearAllOfflineData(): Promise<void> {
+  memoryStore.tickets = [];
+  memoryStore.lastUpdated = null;
+  memoryStore.packs.clear();
+  memoryStore.queue = [];
+
+  try {
+    const db = await getDB();
+    if (db) {
+      const tx = db.transaction(["tickets", "metadata", "scannerPacks", "syncQueue"], "readwrite");
+      await tx.objectStore("tickets").clear();
+      await tx.objectStore("metadata").clear();
+      await tx.objectStore("scannerPacks").clear();
+      await tx.objectStore("syncQueue").clear();
+      await tx.done;
+    }
+  } catch (e) {
+    console.warn("Could not clear IndexedDB stores:", e);
+  }
+
+  if (typeof window !== "undefined" && window.localStorage) {
+    localStorage.removeItem("eventpass_offline_tickets");
+    localStorage.removeItem("eventpass_offline_updated");
+    localStorage.removeItem("eventpass_sync_queue");
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith("eventpass_pack_")) {
+        localStorage.removeItem(key);
+      }
+    });
+  }
+}
+

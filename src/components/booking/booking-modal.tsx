@@ -6,7 +6,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Stepper } from "@/components/ui/stepper";
 import { X, CheckCircle2, AlertTriangle, ShieldCheck, CreditCard } from "lucide-react";
-import { calculateOrderTotal } from "@/lib/domain/booking";
+import { calculateOrderTotal } from "@/lib/domain/order-calc";
+import { saveOfflineTickets, getOfflineTickets } from "@/lib/offline/wallet-storage";
 
 export interface BookingModalProps {
   isOpen: boolean;
@@ -97,6 +98,17 @@ export function BookingModal({ isOpen, onClose, event }: BookingModalProps) {
 
       if (!res.ok) {
         throw new Error(data.error?.message || "Failed to complete booking");
+      }
+
+      if (data.tickets && Array.isArray(data.tickets) && data.tickets.length > 0) {
+        try {
+          const cached = await getOfflineTickets();
+          const existingIds = new Set((cached || []).map((t: any) => t.id));
+          const newOnes = data.tickets.filter((t: any) => !existingIds.has(t.id));
+          await saveOfflineTickets([...(cached || []), ...newOnes]);
+        } catch {
+          // Ignore offline write error
+        }
       }
 
       setStep("success");

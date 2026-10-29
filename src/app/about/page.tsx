@@ -3,22 +3,29 @@
 import React, { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, RotateCcw, ExternalLink, Zap, Smartphone, Sparkles } from "lucide-react";
+import { clearAllOfflineData } from "@/lib/offline/wallet-storage";
 
 export default function AboutPage() {
   const [resetMessage, setResetMessage] = useState<string | null>(null);
 
   async function handleResetIdentity() {
+    try {
+      await fetch("/api/reset", { method: "POST" });
+    } catch {
+      // Ignore network errors in test environments
+    }
+
     // Clear cookies
     document.cookie = "eventpass_guest=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;";
 
-    // Clear local storage & session storage
+    // Clear local storage & session storage & IndexedDB
     try {
+      await clearAllOfflineData();
       localStorage.removeItem("eventpass-theme");
       sessionStorage.clear();
 
-      // Clear IndexedDB stores
       if (window.indexedDB) {
-        const dbs = ["eventpass_offline", "keyval-store"];
+        const dbs = ["eventpass_offline", "keyval-store", "eventpass-offline-storage"];
         for (const dbName of dbs) {
           window.indexedDB.deleteDatabase(dbName);
         }
@@ -27,7 +34,7 @@ export default function AboutPage() {
       // Ignore in non-browser env
     }
 
-    setResetMessage("Demo identity reset. Cookies, local storage, and IndexedDB caches cleared.");
+    setResetMessage("Demo identity reset. Database seeded, cookies, local storage, and IndexedDB caches cleared.");
     setTimeout(() => {
       window.location.href = "/";
     }, 1200);

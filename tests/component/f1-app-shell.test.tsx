@@ -5,6 +5,16 @@ import userEvent from "@testing-library/user-event";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { CommandMenu } from "@/components/ui/command-menu";
 import { Button } from "@/components/ui/button";
+import { AppShell } from "@/components/layout/app-shell";
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => "/",
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    prefetch: vi.fn(),
+  }),
+}));
 
 describe("F1 App Shell & UI Primitives", () => {
   beforeEach(() => {
@@ -57,5 +67,29 @@ describe("F1 App Shell & UI Primitives", () => {
     const btn = screen.getByRole("button", { name: "Click Me" });
     expect(btn).toBeInTheDocument();
     expect(btn.className).toContain("focus-visible:ring");
+  });
+
+  it("renders Reset & Seed button in the desktop sidebar and handles reset click", async () => {
+    const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, message: "Reset complete" }),
+    } as Response);
+
+    render(
+      <AppShell>
+        <div>Content</div>
+      </AppShell>
+    );
+
+    const resetBtn = screen.getByTestId("reset-seed-button");
+    expect(resetBtn).toBeInTheDocument();
+    expect(resetBtn).toHaveTextContent(/Reset & Seed/i);
+
+    await userEvent.click(resetBtn);
+
+    await waitFor(() => {
+      expect(fetchSpy).toHaveBeenCalledWith("/api/reset", { method: "POST" });
+    });
+    fetchSpy.mockRestore();
   });
 });

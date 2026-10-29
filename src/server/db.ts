@@ -2,6 +2,7 @@ import { neonConfig } from "@neondatabase/serverless";
 import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "@prisma/client";
 import ws from "ws";
+import { mockDb, isPlaceholderOrUnreachable } from "./mock-db";
 
 // Set websocket constructor for Neon serverless in Node.js
 if (typeof window === "undefined") {
@@ -11,17 +12,17 @@ if (typeof window === "undefined") {
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 export function isPlaceholderDb(url?: string): boolean {
-  const target = url || process.env.DATABASE_URL;
-  if (!target) return true;
-  return (
-    target.includes("user:password") ||
-    target.includes("ep-sample") ||
-    target.includes("ep-test.us-east-2.aws.neon.tech")
-  );
+  return isPlaceholderOrUnreachable(url || process.env.DATABASE_URL);
 }
 
 export function createPrismaClient(overrideUrl?: string): PrismaClient {
   const connectionString = overrideUrl || process.env.DATABASE_URL;
+
+  // Use in-memory mock database when database URL is placeholder/unreachable in sandbox
+  if (isPlaceholderDb(connectionString)) {
+    return mockDb as unknown as PrismaClient;
+  }
+
   if (!connectionString) {
     return new PrismaClient();
   }

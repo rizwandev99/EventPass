@@ -24,7 +24,8 @@ test.describe("F5 & F6 E2E: Booking Flow & Digital Wallet", () => {
     const bookBtn = page.locator("button:has-text('Get tickets')");
     if (await bookBtn.isVisible()) {
       await bookBtn.click();
-      await expect(page.locator("text=Free")).toBeVisible();
+      await expect(page.getByTestId("booking-modal")).toBeVisible();
+      await expect(page.locator("text=Free").first()).toBeVisible();
     }
   });
 

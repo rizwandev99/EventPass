@@ -1,6 +1,7 @@
 import React from "react";
 import { Sparkles, User } from "lucide-react";
 import { clsx } from "clsx";
+import { MarkdownMessage } from "@/components/assistant/markdown-message";
 
 export interface ChatMessage {
   id: string;
@@ -27,10 +28,10 @@ export function ChatMessageList({ messages, isStreaming = false }: ChatMessageLi
           >
             <div
               className={clsx(
-                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold",
+                "w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-xs font-semibold transition-transform duration-200",
                 isUser
                   ? "bg-[var(--surface-raised)] text-[var(--text)] border border-[var(--border)]"
-                  : "bg-[var(--accent)] text-white shadow-sm"
+                  : "bg-[var(--accent)] text-white shadow-sm ring-2 ring-[var(--accent)]/20"
               )}
             >
               {isUser ? <User className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
@@ -38,13 +39,13 @@ export function ChatMessageList({ messages, isStreaming = false }: ChatMessageLi
 
             <div
               className={clsx(
-                "rounded-2xl px-4 py-3 text-sm max-w-sm sm:max-w-md leading-relaxed whitespace-pre-line",
+                "rounded-2xl px-4 py-3 text-sm leading-relaxed transition-all duration-200",
                 isUser
-                  ? "bg-[var(--accent)] text-white rounded-tr-none shadow-sm"
-                  : "bg-[var(--surface-raised)] text-[var(--text)] border border-[var(--border)] rounded-tl-none shadow-sm"
+                  ? "bg-[var(--accent)] text-white rounded-tr-none shadow-sm max-w-[85%] sm:max-w-md"
+                  : "bg-[var(--surface-raised)] text-[var(--text)] border border-[var(--border)] rounded-tl-none shadow-sm max-w-[92%] sm:max-w-xl md:max-w-2xl"
               )}
             >
-              {msg.content}
+              <MarkdownMessage content={msg.content} isUser={isUser} />
             </div>
           </div>
         );
@@ -52,12 +53,12 @@ export function ChatMessageList({ messages, isStreaming = false }: ChatMessageLi
 
       {isStreaming && (
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0">
-            <Sparkles className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-full bg-[var(--accent)] text-white flex items-center justify-center shrink-0 ring-2 ring-[var(--accent)]/20 shadow-sm">
+            <Sparkles className="w-4 h-4 animate-spin [animation-duration:3s]" />
           </div>
           <div
             data-testid="typing-indicator"
-            className="rounded-2xl px-4 py-3 bg-[var(--surface-raised)] border border-[var(--border)] rounded-tl-none flex items-center gap-1.5"
+            className="rounded-2xl px-4 py-3 bg-[var(--surface-raised)] border border-[var(--border)] rounded-tl-none flex items-center gap-1.5 shadow-sm"
           >
             <div className="w-2 h-2 rounded-full bg-[var(--text-faint)] animate-bounce" />
             <div className="w-2 h-2 rounded-full bg-[var(--text-faint)] animate-bounce [animation-delay:0.2s]" />

@@ -39,7 +39,7 @@ test.describe("F3 & F4 E2E: Event Discovery & Detail View", () => {
 
   test("AC-F4-4: cancelled event shows banner and no booking button; ended event shows ended notice; sold out shows disabled button", async ({ page }) => {
     await page.goto("/events/monsoon-music-fest"); // Seed cancelled event
-    const cancelledBanner = page.locator("text=This event has been cancelled");
+    const cancelledBanner = page.locator("text=This event has been cancelled").first();
     if (await cancelledBanner.isVisible()) {
       await expect(page.locator("button:has-text('Get tickets')")).toBeHidden();
     }

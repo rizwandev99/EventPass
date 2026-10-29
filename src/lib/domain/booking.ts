@@ -4,17 +4,8 @@ import { prisma, isPlaceholderDb } from "@/server/db";
 import { z } from "zod";
 import { generateGuestId, createGuestCookieHeader, getGuestIdFromRequest } from "@/lib/session/guest";
 
-export function calculateOrderTotal(
-  items: { pricePaise: number; quantity: number }[]
-): {
-  totalPaise: number;
-  formattedRupees: string;
-} {
-  const totalPaise = items.reduce((sum, item) => sum + item.pricePaise * item.quantity, 0);
-  const rupees = Math.floor(totalPaise / 100);
-  const formattedRupees = `₹${rupees.toLocaleString("en-IN")}`;
-  return { totalPaise, formattedRupees };
-}
+import { calculateOrderTotal } from "./order-calc";
+export { calculateOrderTotal };
 
 export function generateTicketCode(
   ticketId: string,
@@ -131,37 +122,6 @@ export async function handleCreateOrder(request: NextRequest) {
       );
     }
 
-    // Fallback response for offline sandbox when Prisma connection is placeholder/mock
-    if (isPlaceholderDb()) {
-      const mockOrderId = `ord_mock_${Date.now()}`;
-      const mockTickets = items.flatMap((item) =>
-        Array.from({ length: item.quantity }, () => {
-          const tktId = `tkt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-          return {
-            id: tktId,
-            orderId: mockOrderId,
-            eventId,
-            tierId: item.tierId,
-            attendeeName,
-            code: generateTicketCode(tktId, eventId),
-            status: "VALID" as const,
-          };
-        })
-      );
-
-      const res = NextResponse.json(
-        {
-          order: { id: mockOrderId, status: "CONFIRMED", attendeeName, eventId },
-          tickets: mockTickets,
-        },
-        { status: 201 }
-      );
-      if (newGuestHeader) {
-        res.headers.set("Set-Cookie", newGuestHeader);
-      }
-      return res;
-    }
-
     // Database atomic transaction
     try {
       const result = await prisma.$transaction(async (tx) => {
@@ -241,7 +201,21 @@ export async function handleCreateOrder(request: NextRequest) {
                 status: "VALID",
               },
             });
-            createdTickets.push(ticket);
+            createdTickets.push({
+              ...ticket,
+              event: {
+                id: event.id,
+                slug: event.slug,
+                title: event.title,
+                startsAt: event.startsAt,
+                endsAt: event.endsAt,
+                venueName: event.venueName,
+                city: event.city,
+                status: event.status,
+                coverSeed: event.coverSeed,
+                category: event.category,
+              },
+            });
           }
         }
 
@@ -251,6 +225,12 @@ export async function handleCreateOrder(request: NextRequest) {
       const response = NextResponse.json(result, { status: 201 });
       if (newGuestHeader) {
         response.headers.set("Set-Cookie", newGuestHeader);
+        response.cookies.set("eventpass_guest", guestId!, {
+          path: "/",
+          httpOnly: true,
+          sameSite: "lax",
+          maxAge: 31536000,
+        });
       }
       return response;
     } catch (txErr: any) {
@@ -267,34 +247,16 @@ export async function handleCreateOrder(request: NextRequest) {
         );
       }
 
-      // Fallback response for offline sandbox when Prisma connection is mock
-      const mockOrderId = `ord_mock_${Date.now()}`;
-      const mockTickets = items.flatMap((item) =>
-        Array.from({ length: item.quantity }, () => {
-          const tktId = `tkt_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
-          return {
-            id: tktId,
-            orderId: mockOrderId,
-            eventId,
-            tierId: item.tierId,
-            attendeeName,
-            code: generateTicketCode(tktId, eventId),
-            status: "VALID" as const,
-          };
-        })
-      );
-
-      const res = NextResponse.json(
+      return NextResponse.json(
         {
-          order: { id: mockOrderId, status: "CONFIRMED", attendeeName, eventId },
-          tickets: mockTickets,
+          error: {
+            code: "INTERNAL",
+            message: txErr.message || "Failed to process booking transaction",
+            details: {},
+          },
         },
-        { status: 201 }
+        { status: 500 }
       );
-      if (newGuestHeader) {
-        res.headers.set("Set-Cookie", newGuestHeader);
-      }
-      return res;
     }
   } catch (err: any) {
     return NextResponse.json(
